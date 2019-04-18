@@ -1261,16 +1261,16 @@ class EditParamTool(Widget):
         self.apply = Button(bax3, "Apply")
 
         # Title
-        tax = toolfig.add_axes([0.2, 0.8, 0.3, 0.075])
+        tax = toolfig.add_axes([0.15, 0.8, 0.3, 0.075])
         self.titleChange = False
         self.newTitle = ""
         self.title = TextBox(tax, "Title", axes.get_title())
 
         # X Axis
         xmin, xmax = map(float, axes.get_xlim())
-        left = toolfig.add_axes([0.25, 0.7, 0.3, 0.075])
-        right = toolfig.add_axes([0.25, 0.6, 0.3, 0.075])
-        xlabel = toolfig.add_axes([0.25, 0.5, 0.3, 0.075])
+        left = toolfig.add_axes([0.15, 0.7, 0.3, 0.075])
+        right = toolfig.add_axes([0.15, 0.6, 0.3, 0.075])
+        xlabel = toolfig.add_axes([0.15, 0.5, 0.3, 0.075])
         self.leftChange, self.rightChange, self.xlabelChange = False, False, False
         self.newLeft, self.newRight, self.newXlabel = "", "", ""
         self.left = TextBox(left, "Left", xmin)
@@ -1279,9 +1279,9 @@ class EditParamTool(Widget):
 
         # Y Axis
         ymin, ymax = map(float, axes.get_ylim())
-        bottom = toolfig.add_axes([0.25, 0.4, 0.3, 0.075])
-        top = toolfig.add_axes([0.25, 0.3, 0.3, 0.075])
-        ylabel = toolfig.add_axes([0.25, 0.2, 0.3, 0.075])
+        bottom = toolfig.add_axes([0.15, 0.4, 0.3, 0.075])
+        top = toolfig.add_axes([0.15, 0.3, 0.3, 0.075])
+        ylabel = toolfig.add_axes([0.15, 0.2, 0.3, 0.075])
         self.bottomChange, self.topChange, self.ylabelChange = False, False, False
         self.newBottom, self.newTop, self.newYlabel = "", "", ""
         self.bottom = TextBox(bottom, "Bottom", ymin)
@@ -1289,8 +1289,8 @@ class EditParamTool(Widget):
         self.ylabel = TextBox(ylabel, "Y-Label", axes.get_ylabel())
 
         #Scale
-        xaxscale = toolfig.add_axes([0.7, 0.5, 0.075, 0.3])
-        xaxscale.set_title("X Axis Scale")
+        xaxscale = toolfig.add_axes([0.6, 0.5, 0.075, 0.3])
+        xaxscale.set_title("X Scale")
         active = -1
         if axes.get_xscale() == "linear":
             active = 0
@@ -1302,8 +1302,8 @@ class EditParamTool(Widget):
         self.xscaleChange = False
         self.newXscale = ""
 
-        yaxscale = toolfig.add_axes([0.7, 0.2, 0.075, 0.3])
-        yaxscale.set_title("Y Axis Scale")
+        yaxscale = toolfig.add_axes([0.75, 0.5, 0.075, 0.3])
+        yaxscale.set_title("Y Scale")
         active = -1
         if axes.get_yscale() == "linear":
             active = 0
@@ -1315,10 +1315,14 @@ class EditParamTool(Widget):
         self.yscaleChange = False
         self.newYscale = ""
 
+        axlegend = toolfig.add_axes([0.6, 0.2, 0.3, 0.2])
+        self.legend = CheckButtons(axlegend, ["(Re-)Generate \nAutomatic Legend"])
+        self.drawLegend = False
+
         def func_cancel(event):
             thisdrawon = self.drawon
             self.drawon = False
-            self.clear_title(axes.get_title())
+            self.clear_title_legend(axes.get_title())
             x_min, x_max = map(float, axes.get_xlim())
             y_min, y_max = map(float, axes.get_ylim())
             self.clear_x(x_min, x_max, axes.get_xlabel())
@@ -1356,14 +1360,27 @@ class EditParamTool(Widget):
             if self.ylabelChange:
                 axes.set_ylabel(self.newYlabel)
 
-            if self.xscaleChange:
-                print(self.newXscale)
+            if self.xscaleChange and self.newXscale != axes.get_xscale():
                 axes.set_xscale(self.newXscale)
 
-            if self.yscaleChange:
+            if self.yscaleChange and self.newYscale != axes.get_yscale():
                 axes.set_yscale(self.newYscale)
 
-            self.clear_title(axes.get_title())
+            if self.drawLegend:
+                draggable = None
+                ncol = 1
+                if axes.legend_ is not None:
+                    old_legend = axes.get_legend()
+                    draggable = old_legend._draggable is not None
+                    ncol = old_legend._ncol
+                new_legend = axes.legend(ncol=ncol)
+                if new_legend:
+                    new_legend.set_draggable(draggable)
+
+            axes.xaxis._update_axisinfo()
+            axes.yaxis._update_axisinfo()
+
+            self.clear_title_legend(axes.get_title())
             x_min, x_max = map(float, axes.get_xlim())
             y_min, y_max = map(float, axes.get_ylim())
             self.clear_x(x_min, x_max, axes.get_xlabel())
@@ -1386,6 +1403,7 @@ class EditParamTool(Widget):
         self.ylabel.on_submit(self.func_y_label)
         self.xscale.on_clicked(self.func_x_scale)
         self.yscale.on_clicked(self.func_y_scale)
+        self.legend.on_clicked(self.func_legend)
 
     def func_title(self, val):
         if self.drawon:
@@ -1448,10 +1466,17 @@ class EditParamTool(Widget):
             self.yscaleChange = True
             self.newYscale = val
 
-    def clear_title(self, title):
+    def func_legend(self, val):
+        if self.drawon:
+            self.drawLegend = self.legend.get_status()[0]
+
+    def clear_title_legend(self, title):
         self.titleChange = False
         self.newTitle = ""
         self.title.set_val(title)
+        if self.legend.get_status()[0]:
+            self.legend.set_active(0)
+            self.drawLegend = False
 
     def clear_x(self, xmin, xmax, xlabel):
         self.leftChange, self.rightChange, self.xlabelChange = False, False, False
@@ -1477,8 +1502,7 @@ class EditParamTool(Widget):
             active = 1
         elif xscale == "logit":
             active = 2
-        self.xscale = RadioButtons(xaxscale, ["linear", "log", "logit"], active)
-        self.xscale.on_clicked(self.func_x_scale)
+        self.xscale.set_active(active)
 
         active = -1
         if yscale == "linear":
@@ -1487,8 +1511,7 @@ class EditParamTool(Widget):
             active = 1
         elif yscale == "logit":
             active = 2
-        self.yscale = RadioButtons(yaxscale, ["linear", "log", "logit"], active)
-        self.yscale.on_clicked(self.func_y_scale)
+        self.yscale.set_active(active)
 
 class Cursor(AxesWidget):
     """
