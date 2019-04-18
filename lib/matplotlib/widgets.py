@@ -1265,35 +1265,55 @@ class EditParamTool(Widget):
         self.titleChange = False
         self.newTitle = ""
         self.title = TextBox(tax, "Title", axes.get_title())
-        self.title.on_submit(self.func_title)
 
         # X Axis
         xmin, xmax = map(float, axes.get_xlim())
-        left = toolfig.add_axes([0.4, 0.7, 0.3, 0.075])
-        right = toolfig.add_axes([0.4, 0.6, 0.3, 0.075])
-        xlabel = toolfig.add_axes([0.4, 0.5, 0.3, 0.075])
+        left = toolfig.add_axes([0.25, 0.7, 0.3, 0.075])
+        right = toolfig.add_axes([0.25, 0.6, 0.3, 0.075])
+        xlabel = toolfig.add_axes([0.25, 0.5, 0.3, 0.075])
         self.leftChange, self.rightChange, self.xlabelChange = False, False, False
         self.newLeft, self.newRight, self.newXlabel = "", "", ""
         self.left = TextBox(left, "Left", xmin)
         self.right = TextBox(right, "Right", xmax)
         self.xlabel = TextBox(xlabel, "X-Label", axes.get_xlabel())
-        self.left.on_submit(self.func_left)
-        self.right.on_submit(self.func_right)
-        self.xlabel.on_submit(self.func_x_label)
 
         # Y Axis
         ymin, ymax = map(float, axes.get_ylim())
-        bottom = toolfig.add_axes([0.4, 0.4, 0.3, 0.075])
-        top = toolfig.add_axes([0.4, 0.3, 0.3, 0.075])
-        ylabel = toolfig.add_axes([0.4, 0.2, 0.3, 0.075])
+        bottom = toolfig.add_axes([0.25, 0.4, 0.3, 0.075])
+        top = toolfig.add_axes([0.25, 0.3, 0.3, 0.075])
+        ylabel = toolfig.add_axes([0.25, 0.2, 0.3, 0.075])
         self.bottomChange, self.topChange, self.ylabelChange = False, False, False
         self.newBottom, self.newTop, self.newYlabel = "", "", ""
         self.bottom = TextBox(bottom, "Bottom", ymin)
         self.top = TextBox(top, "Top", ymax)
         self.ylabel = TextBox(ylabel, "Y-Label", axes.get_ylabel())
-        self.bottom.on_submit(self.func_bottom)
-        self.top.on_submit(self.func_top)
-        self.ylabel.on_submit(self.func_y_label)
+
+        #Scale
+        xaxscale = toolfig.add_axes([0.7, 0.5, 0.075, 0.3])
+        xaxscale.set_title("X Axis Scale")
+        active = -1
+        if axes.get_xscale() == "linear":
+            active = 0
+        elif axes.get_xscale() == "log":
+            active = 1
+        elif axes.get_xscale() == "logit":
+            active = 2
+        self.xscale = RadioButtons(xaxscale, ["linear", "log", "logit"], active)
+        self.xscaleChange = False
+        self.newXscale = ""
+
+        yaxscale = toolfig.add_axes([0.7, 0.2, 0.075, 0.3])
+        yaxscale.set_title("Y Axis Scale")
+        active = -1
+        if axes.get_yscale() == "linear":
+            active = 0
+        elif axes.get_yscale() == "log":
+            active = 1
+        elif axes.get_yscale() == "logit":
+            active = 2
+        self.yscale = RadioButtons(yaxscale, ["linear", "log", "logit"], active)
+        self.yscaleChange = False
+        self.newYscale = ""
 
         def func_cancel(event):
             thisdrawon = self.drawon
@@ -1303,6 +1323,7 @@ class EditParamTool(Widget):
             y_min, y_max = map(float, axes.get_ylim())
             self.clear_x(x_min, x_max, axes.get_xlabel())
             self.clear_y(y_min, y_max, axes.get_ylabel())
+            self.clear_scale(axes.get_xscale(), axes.get_yscale(), xaxscale, yaxscale)
             self.drawon = thisdrawon
 
         def func_apply(event):
@@ -1335,11 +1356,19 @@ class EditParamTool(Widget):
             if self.ylabelChange:
                 axes.set_ylabel(self.newYlabel)
 
+            if self.xscaleChange:
+                print(self.newXscale)
+                axes.set_xscale(self.newXscale)
+
+            if self.yscaleChange:
+                axes.set_yscale(self.newYscale)
+
             self.clear_title(axes.get_title())
             x_min, x_max = map(float, axes.get_xlim())
             y_min, y_max = map(float, axes.get_ylim())
             self.clear_x(x_min, x_max, axes.get_xlabel())
             self.clear_y(y_min, y_max, axes.get_ylabel())
+            self.clear_scale(axes.get_xscale(), axes.get_yscale(), xaxscale, yaxscale)
 
             self.drawon = thisdrawon
             if self.drawon:
@@ -1348,6 +1377,15 @@ class EditParamTool(Widget):
 
         self.apply.on_clicked(func_apply)
         self.cancel.on_clicked(func_cancel)
+        self.title.on_submit(self.func_title)
+        self.left.on_submit(self.func_left)
+        self.right.on_submit(self.func_right)
+        self.xlabel.on_submit(self.func_x_label)
+        self.bottom.on_submit(self.func_bottom)
+        self.top.on_submit(self.func_top)
+        self.ylabel.on_submit(self.func_y_label)
+        self.xscale.on_clicked(self.func_x_scale)
+        self.yscale.on_clicked(self.func_y_scale)
 
     def func_title(self, val):
         if self.drawon:
@@ -1400,6 +1438,16 @@ class EditParamTool(Widget):
             self.ylabelChange = True
             self.newYlabel = val
 
+    def func_x_scale(self, val):
+        if self.drawon:
+            self.xscaleChange = True
+            self.newXscale = val
+
+    def func_y_scale(self, val):
+        if self.drawon:
+            self.yscaleChange = True
+            self.newYscale = val
+
     def clear_title(self, title):
         self.titleChange = False
         self.newTitle = ""
@@ -1418,6 +1466,29 @@ class EditParamTool(Widget):
         self.bottom.set_val(ymin)
         self.top.set_val(ymax)
         self.ylabel.set_val(ylabel)
+
+    def clear_scale(self, xscale, yscale, xaxscale, yaxscale):
+        self.xscaleChange, self.yscaleChange = False, False
+        self.newXscale, self.newYscale = "", ""
+        active = -1
+        if xscale == "linear":
+            active = 0
+        elif xscale == "log":
+            active = 1
+        elif xscale == "logit":
+            active = 2
+        self.xscale = RadioButtons(xaxscale, ["linear", "log", "logit"], active)
+        self.xscale.on_clicked(self.func_x_scale)
+
+        active = -1
+        if yscale == "linear":
+            active = 0
+        elif yscale == "log":
+            active = 1
+        elif yscale == "logit":
+            active = 2
+        self.yscale = RadioButtons(yaxscale, ["linear", "log", "logit"], active)
+        self.yscale.on_clicked(self.func_y_scale)
 
 class Cursor(AxesWidget):
     """
