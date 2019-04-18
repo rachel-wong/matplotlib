@@ -18,7 +18,7 @@ from matplotlib.backend_bases import (
 from matplotlib.backend_managers import ToolManager
 from matplotlib._pylab_helpers import Gcf
 from matplotlib.figure import Figure
-from matplotlib.widgets import SubplotTool
+from matplotlib.widgets import SubplotTool, EditParamTool
 from . import _tkagg
 
 try:
@@ -649,11 +649,33 @@ class NavigationToolbar2Tk(NavigationToolbar2, tk.Frame):
                                       command=getattr(self, callback))
                 if tooltip_text is not None:
                     ToolTip.createToolTip(button, tooltip_text)
+                if text == 'Subplots':
+                    button = self._Button(text='Customize', file="qt4_editor_options",
+                                          command=getattr(self, "edit_parameters"),
+                                          extension='.png')
+                    ToolTip.createToolTip(button, 'Edit axis, curve and image parameters')
 
         self.message = tk.StringVar(master=self)
         self._message_label = tk.Label(master=self, textvariable=self.message)
         self._message_label.pack(side=tk.RIGHT)
         self.pack(side=tk.BOTTOM, fill=tk.X)
+
+    def edit_parameters(self):
+        axes = self.canvas.figure.get_axes()
+        if not axes:
+            tkinter.messagebox.showerror("Error", "There are no axes to edit.")
+            return
+        elif len(axes) == 1:
+            ax, = axes
+
+        toolfig = Figure(figsize=(6, 3))
+        window = tk.Toplevel()
+        canvas = type(self.canvas)(toolfig, master=window)
+        toolfig.subplots_adjust(top=0.9)
+        canvas.tool = EditParamTool(self.canvas.figure, toolfig, ax)
+        canvas.draw()
+        canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+        window.grab_set()
 
     def configure_subplots(self):
         toolfig = Figure(figsize=(6, 3))

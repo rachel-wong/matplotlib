@@ -1249,6 +1249,176 @@ class SubplotTool(Widget):
             self.targetfig.canvas.draw()
 
 
+class EditParamTool(Widget):
+    def __init__(self, targetfig, toolfig, axes):
+        self.targetfig = targetfig
+        toolfig.subplots_adjust(left=0.2, right=0.9)
+
+        # Buttons
+        bax2 = toolfig.add_axes([0.6, 0.05, 0.15, 0.07])
+        bax3 = toolfig.add_axes([0.8, 0.05, 0.15, 0.07])
+        self.cancel = Button(bax2, "Cancel")
+        self.apply = Button(bax3, "Apply")
+
+        # Title
+        tax = toolfig.add_axes([0.2, 0.8, 0.3, 0.075])
+        self.titleChange = False
+        self.newTitle = ""
+        self.title = TextBox(tax, "Title", axes.get_title())
+        self.title.on_submit(self.func_title)
+
+        # X Axis
+        xmin, xmax = map(float, axes.get_xlim())
+        left = toolfig.add_axes([0.4, 0.7, 0.3, 0.075])
+        right = toolfig.add_axes([0.4, 0.6, 0.3, 0.075])
+        xlabel = toolfig.add_axes([0.4, 0.5, 0.3, 0.075])
+        self.leftChange, self.rightChange, self.xlabelChange = False, False, False
+        self.newLeft, self.newRight, self.newXlabel = "", "", ""
+        self.left = TextBox(left, "Left", xmin)
+        self.right = TextBox(right, "Right", xmax)
+        self.xlabel = TextBox(xlabel, "X-Label", axes.get_xlabel())
+        self.left.on_submit(self.func_left)
+        self.right.on_submit(self.func_right)
+        self.xlabel.on_submit(self.func_x_label)
+
+        # Y Axis
+        ymin, ymax = map(float, axes.get_ylim())
+        bottom = toolfig.add_axes([0.4, 0.4, 0.3, 0.075])
+        top = toolfig.add_axes([0.4, 0.3, 0.3, 0.075])
+        ylabel = toolfig.add_axes([0.4, 0.2, 0.3, 0.075])
+        self.bottomChange, self.topChange, self.ylabelChange = False, False, False
+        self.newBottom, self.newTop, self.newYlabel = "", "", ""
+        self.bottom = TextBox(bottom, "Bottom", ymin)
+        self.top = TextBox(top, "Top", ymax)
+        self.ylabel = TextBox(ylabel, "Y-Label", axes.get_ylabel())
+        self.bottom.on_submit(self.func_bottom)
+        self.top.on_submit(self.func_top)
+        self.ylabel.on_submit(self.func_y_label)
+
+        def func_cancel(event):
+            thisdrawon = self.drawon
+            self.drawon = False
+            self.clear_title(axes.get_title())
+            x_min, x_max = map(float, axes.get_xlim())
+            y_min, y_max = map(float, axes.get_ylim())
+            self.clear_x(x_min, x_max, axes.get_xlabel())
+            self.clear_y(y_min, y_max, axes.get_ylabel())
+            self.drawon = thisdrawon
+
+        def func_apply(event):
+            thisdrawon = self.drawon
+            self.drawon = False
+
+            x_min, x_max = map(float, axes.get_xlim())
+            y_min, y_max = map(float, axes.get_ylim())
+
+            if self.titleChange:
+                axes.set_title(self.newTitle)
+
+            if self.rightChange and self.leftChange:
+                axes.set_xlim(self.newLeft, self.newRight)
+            elif self.leftChange:
+                axes.set_xlim(self.newLeft, x_max)
+            elif self.rightChange:
+                axes.set_xlim(x_min, self.newRight)
+
+            if self.bottomChange and self.topChange:
+                axes.set_ylim(self.newBottom, self.newTop)
+            elif self.bottomChange:
+                axes.set_ylim(self.newBottom, y_max)
+            elif self.topChange:
+                axes.set_ylim(y_min, self.newTop)
+
+            if self.xlabelChange:
+                axes.set_xlabel(self.newXlabel)
+
+            if self.ylabelChange:
+                axes.set_ylabel(self.newYlabel)
+
+            self.clear_title(axes.get_title())
+            x_min, x_max = map(float, axes.get_xlim())
+            y_min, y_max = map(float, axes.get_ylim())
+            self.clear_x(x_min, x_max, axes.get_xlabel())
+            self.clear_y(y_min, y_max, axes.get_ylabel())
+
+            self.drawon = thisdrawon
+            if self.drawon:
+                toolfig.canvas.draw()
+                self.targetfig.canvas.draw()
+
+        self.apply.on_clicked(func_apply)
+        self.cancel.on_clicked(func_cancel)
+
+    def func_title(self, val):
+        if self.drawon:
+            self.titleChange = True
+            self.newTitle = val
+
+    def func_left(self, val):
+        if self.drawon:
+            try:
+                float(val)
+                self.leftChange = True
+                self.newLeft = float(val)
+            except ValueError:
+                self.leftChange = False
+
+    def func_right(self, val):
+        if self.drawon:
+            try:
+                float(val)
+                self.rightChange = True
+                self.newRight = float(val)
+            except ValueError:
+                self.rightChange = False
+
+    def func_bottom(self, val):
+        if self.drawon:
+            try:
+                float(val)
+                self.bottomChange = True
+                self.newBottom = float(val)
+            except ValueError:
+                self.bottomChange = False
+
+    def func_top(self, val):
+        if self.drawon:
+            try:
+                float(val)
+                self.topChange = True
+                self.newTop = float(val)
+            except ValueError:
+                self.topChange = False
+
+    def func_x_label(self, val):
+        if self.drawon:
+            self.xlabelChange = True
+            self.newXlabel = val
+
+    def func_y_label(self, val):
+        if self.drawon:
+            self.ylabelChange = True
+            self.newYlabel = val
+
+    def clear_title(self, title):
+        self.titleChange = False
+        self.newTitle = ""
+        self.title.set_val(title)
+
+    def clear_x(self, xmin, xmax, xlabel):
+        self.leftChange, self.rightChange, self.xlabelChange = False, False, False
+        self.newLeft, self.newRight, self.newXlabel = "", "", ""
+        self.left.set_val(xmin)
+        self.right.set_val(xmax)
+        self.xlabel.set_val(xlabel)
+
+    def clear_y(self, ymin, ymax, ylabel):
+        self.bottomChange, self.topChange, self.ylabelChange = False, False, False
+        self.newBottom, self.newTop, self.newYlabel = "", "", ""
+        self.bottom.set_val(ymin)
+        self.top.set_val(ymax)
+        self.ylabel.set_val(ylabel)
+
 class Cursor(AxesWidget):
     """
     A crosshair cursor that spans the axes and moves with mouse cursor.
