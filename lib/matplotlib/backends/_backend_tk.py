@@ -668,7 +668,7 @@ class NavigationToolbar2Tk(NavigationToolbar2, tk.Frame):
         elif len(axes) == 1:
             ax, = axes
 
-        toolfig = Figure(figsize=(6, 3))
+        toolfig = Figure(figsize=(8, 5))
         window = tk.Toplevel()
         canvas = type(self.canvas)(toolfig, master=window)
         toolfig.subplots_adjust(top=0.9)

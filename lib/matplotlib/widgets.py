@@ -18,6 +18,7 @@ from . import cbook, rcParams
 from .lines import Line2D
 from .patches import Circle, Rectangle, Ellipse
 from .transforms import blended_transform_factory
+from matplotlib import cm, colors as mcolors, markers, image as mimage
 
 
 class LockDraw(object):
@@ -1250,15 +1251,282 @@ class SubplotTool(Widget):
 
 
 class EditParamTool(Widget):
+    def __init__(self, targetfig, toolfig ,axes):
+        self.targetfig = targetfig
+        toolfig.subplots_adjust(left=0.2, right=0.9)
+
+        bax1 = toolfig.add_axes([0.35, 0.9, 0.15, 0.07])
+        bax2 = toolfig.add_axes([0.5, 0.9, 0.15, 0.07])
+        self.axes = Button(bax1, "Axes", color='lightgoldenrodyellow', hovercolor='lightgoldenrodyellow')
+        self.curves = Button(bax2, "Curves", color='gray', hovercolor='gray')
+        self.edit_tab_num = 0
+        self.display_tab = AxesEditor(targetfig, toolfig, axes)
+
+        def func_axes(event):
+            if self.edit_tab_num != 0:
+                thisdrawon = self.drawon
+                self.drawon = False
+                self.edit_tab_num = 0
+                self.clear_toolfig_axes(toolfig)
+                self.display_tab = AxesEditor(targetfig, toolfig, axes)
+                self.axes = Button(bax1, "Axes", color='lightgoldenrodyellow', hovercolor='lightgoldenrodyellow')
+                self.curves = Button(bax2, "Curves", color='gray', hovercolor='gray')
+                self.axes.on_clicked(func_axes)
+                self.curves.on_clicked(func_curves)
+
+                self.drawon = thisdrawon
+                if self.drawon:
+                    toolfig.canvas.draw()
+                    self.targetfig.canvas.draw()
+
+        def func_curves(event):
+            if self.edit_tab_num != 1:
+                thisdrawon = self.drawon
+                self.drawon = False
+                self.edit_tab_num = 1
+                self.clear_toolfig_axes(toolfig)
+                self.display_tab = CurvesEditor(targetfig, toolfig, axes)
+                self.axes = Button(bax1, "Axes", color='gray', hovercolor='gray')
+                self.curves = Button(bax2, "Curves", color='lightgoldenrodyellow', hovercolor='lightgoldenrodyellow')
+                self.axes.on_clicked(func_axes)
+                self.curves.on_clicked(func_curves)
+
+                self.drawon = thisdrawon
+                if self.drawon:
+                    toolfig.canvas.draw()
+                    self.targetfig.canvas.draw()
+
+        self.axes.on_clicked(func_axes)
+        self.curves.on_clicked(func_curves)
+
+    def clear_toolfig_axes(self, toolfig):
+        for ax in toolfig.get_axes():
+            points = ax.get_position().get_points()
+            if points[0][0] == 0.35 and points[0][1] == 0.9:
+                continue
+            if points[0][0] == 0.5 and points[0][1] == 0.9:
+                continue
+            toolfig.delaxes(ax)
+
+class CurvesEditor(Widget):
+    LINESTYLES = {'-': 'Solid',
+                  '--': 'Dashed',
+                  '-.': 'DashDot',
+                  ':': 'Dotted',
+                  'None': 'None',
+                  }
+
+    DRAWSTYLES = {
+        'default': 'Default',
+        'steps-pre': 'Steps (Pre)',
+        'steps-mid': 'Steps (Mid)',
+        'steps-post': 'Steps (Post)'}
+
+    def __init__(self, targetfig, toolfig, axes):
+
+        self.targetfig = targetfig
+        toolfig.subplots_adjust(left=0.2, right=0.9)
+
+        # Buttons
+        bax1 = toolfig.add_axes([0.65, 0.05, 0.15, 0.07])
+        bax2 = toolfig.add_axes([0.83, 0.05, 0.15, 0.07])
+        bax3 = toolfig.add_axes([0.55, 0.75, 0.15, 0.07])
+        self.cancel = Button(bax1, "Cancel")
+        self.apply = Button(bax2, "Apply")
+        self.switchLine = Button(bax3, "Get Line Info")
+
+        # Curve To Edit
+        curvename = toolfig.add_axes([0.2, 0.75, 0.3, 0.075])
+        self.viewLabel = axes.get_lines()[0].get_label()
+        self.viewNew = ""
+        self.viewChange = False
+        self.all_labels = self.get_labels(axes)
+        curvename.set_title(self.all_labels)
+        self.view = TextBox(curvename, "View line:", self.viewLabel)
+
+        # Curve info
+        labelax = toolfig.add_axes([0.1, 0.6, 0.3, 0.075])
+        self.labelChange = False
+        self.newLabel = ""
+        self.label = TextBox(labelax, "Label", self.viewLabel)
+
+        # Get line to edit
+        self.line = self.get_line(axes.get_lines(), self.viewLabel)
+
+        # line Info
+        lax1 = toolfig.add_axes([0.03, 0.2, 0.15, 0.3])
+        lax2 = toolfig.add_axes([0.2, 0.2, 0.15, 0.3])
+        lax3 = toolfig.add_axes([0.08, 0.1, 0.1, 0.075])
+        lax4 = toolfig.add_axes([0.25, 0.1, 0.1, 0.075])
+        lax1.set_title("Line Style")
+        lax2.set_title("Draw Style")
+        active = list(self.LINESTYLES.keys()).index(self.line.get_linestyle())
+        self.linestyle = RadioButtons(lax1, list(self.LINESTYLES.values()), active)
+        active = list(self.DRAWSTYLES.keys()).index(self.line.get_drawstyle())
+        self.drawstyle = RadioButtons(lax2, list(self.DRAWSTYLES.values()), active)
+        self.linewidth = TextBox(lax3, "Width", str(self.line.get_linewidth()))
+        self.color = TextBox(lax4, "Color\n(RGBA)", self.line.get_color())
+        self.newLinestyle, self.newDrawstyle, self.newWidth, self.newColor = "", "", "", ""
+        self.linestyleChange, self.drawstyleChange, self.widthChange, self.colorChange = False, False, False, False
+
+        def line_switch(event):
+            thisdrawon = self.drawon
+            self.drawon = False
+            if self.viewChange:
+                self.viewLabel = self.viewNew
+                self.view.set_val(self.viewLabel)
+                self.viewChange = False
+
+                #update the curve info in the following fields:
+                self.label.set_val(self.viewLabel)
+                self.line = self.get_line(axes.get_lines(), self.viewLabel)
+                active = list(self.LINESTYLES.keys()).index(self.line.get_linestyle())
+                self.linestyle.set_active(active)
+                active = list(self.DRAWSTYLES.keys()).index(self.line.get_drawstyle())
+                self.drawstyle.set_active(active)
+                self.linewidth.set_val(str(self.line.get_linewidth()))
+                self.color.set_val(self.line.get_color())
+
+            self.drawon = thisdrawon
+            if self.drawon:
+                toolfig.canvas.draw()
+                self.targetfig.canvas.draw()
+
+        def cancel(event):
+            print("cancell")
+
+        def apply(event):
+            thisdrawon = self.drawon
+            self.drawon = False
+            if self.labelChange:
+                self.line.set_label(self.newLabel)
+                self.all_labels = self.get_labels(axes)
+                curvename.set_title(self.all_labels)
+                self.viewLabel = self.newLabel
+                self.view.set_val(self.viewLabel)
+            if self.linestyleChange:
+                self.line.set_linestyle(self.newLinestyle)
+                self.linestyleChange = False
+            if self.drawstyleChange:
+                self.line.set_drawstyle(self.newDrawstyle)
+                self.drawstyleChange = False
+            if self.widthChange:
+                print("hi")
+                self.line.set_linewidth(self.newWidth)
+                self.widthChange = False
+            if self.colorChange:
+                self.line.set_alpha(None)
+                self.line.set_color(self.newColor)
+                self.colorChange = False
+
+            self.line = self.get_line(axes.get_lines(), self.viewLabel)
+            self.drawon = thisdrawon
+            if self.drawon:
+                toolfig.canvas.draw()
+                self.targetfig.canvas.draw()
+
+        self.apply.on_clicked(apply)
+        self.cancel.on_clicked(cancel)
+        self.view.on_submit(self.func_change_view)
+        self.switchLine.on_clicked(line_switch)
+        self.label.on_submit(self.func_label)
+        self.linestyle.on_clicked(self.func_line_style)
+        self.drawstyle.on_clicked(self.func_draw_style)
+        self.linewidth.on_submit(self.func_width)
+        self.color.on_submit(self.func_color)
+
+
+    def get_labels(self, axes):
+        labels = []
+        for ax in axes.get_lines():
+            labels.append(ax.get_label())
+        return labels
+
+    def get_line(self, lines, label):
+        for line in lines:
+            if line.get_label() == label:
+                return line
+        return lines[0]
+
+    def func_change_view(self, val):
+        if self.drawon:
+            if val not in self.all_labels:
+                self.view.set_val(self.viewLabel) # label name dne, put what we currently display
+                self.viewChange = False
+            elif val != self.viewLabel:
+                self.viewNew = val
+                self.viewChange = True
+
+    def func_label(self, val):
+        if self.drawon:
+            if val not in self.all_labels: # not same name as another line
+                self.labelChange = True
+                self.newLabel = val
+            else:
+                self.labelChange = False
+                self.label.set_val(self.viewLabel)
+
+    def func_line_style(self, val):
+        if self.drawon:
+            style = ""
+            for i,j in self.LINESTYLES.items():
+                if val == j:
+                    style = i
+
+            if style != self.line.get_linestyle():
+                self.linestyleChange = True
+                self.newLinestyle = style
+            else:
+                self.linestyleChange = False
+
+    def func_draw_style(self, val):
+        if self.drawon:
+            style = ""
+            for i,j in self.DRAWSTYLES.items():
+                if val == j:
+                    style = i
+
+            if style != self.line.get_drawstyle():
+                self.drawstyleChange = True
+                self.newDrawstyle = style
+            else:
+                self.drawstyleChange = False
+
+    def func_width(self, val):
+        if self.drawon:
+            # print(val)
+            try:
+                print(val)
+                float(val)
+                self.widthChange = True
+                self.newWidth = float(val)
+            except ValueError:
+                self.widthChange = False
+                self.linewidth.set_val(str(self.line.get_linewidth()))
+
+
+    def func_color(self, val):
+        print(val)
+        if self.drawon:
+            try:
+                rgba = mcolors.to_rgba(val)
+                self.newColor = rgba
+                self.colorChange = True
+            except:
+                self.color.set_val(self.line.get_color())
+                self.colorChange = False
+
+
+class AxesEditor(Widget):
     def __init__(self, targetfig, toolfig, axes):
         self.targetfig = targetfig
         toolfig.subplots_adjust(left=0.2, right=0.9)
 
         # Buttons
-        bax2 = toolfig.add_axes([0.6, 0.05, 0.15, 0.07])
-        bax3 = toolfig.add_axes([0.8, 0.05, 0.15, 0.07])
-        self.cancel = Button(bax2, "Cancel")
-        self.apply = Button(bax3, "Apply")
+        bax1 = toolfig.add_axes([0.65, 0.05, 0.15, 0.07])
+        bax2 = toolfig.add_axes([0.83, 0.05, 0.15, 0.07])
+        self.cancel = Button(bax1, "Cancel")
+        self.apply = Button(bax2, "Apply")
 
         # Title
         tax = toolfig.add_axes([0.15, 0.8, 0.3, 0.075])
@@ -1273,8 +1541,8 @@ class EditParamTool(Widget):
         xlabel = toolfig.add_axes([0.15, 0.5, 0.3, 0.075])
         self.leftChange, self.rightChange, self.xlabelChange = False, False, False
         self.newLeft, self.newRight, self.newXlabel = "", "", ""
-        self.left = TextBox(left, "Left", xmin)
-        self.right = TextBox(right, "Right", xmax)
+        self.left = TextBox(left, "Left", str(xmin))
+        self.right = TextBox(right, "Right", str(xmax))
         self.xlabel = TextBox(xlabel, "X-Label", axes.get_xlabel())
 
         # Y Axis
@@ -1284,12 +1552,12 @@ class EditParamTool(Widget):
         ylabel = toolfig.add_axes([0.15, 0.2, 0.3, 0.075])
         self.bottomChange, self.topChange, self.ylabelChange = False, False, False
         self.newBottom, self.newTop, self.newYlabel = "", "", ""
-        self.bottom = TextBox(bottom, "Bottom", ymin)
-        self.top = TextBox(top, "Top", ymax)
+        self.bottom = TextBox(bottom, "Bottom", str(ymin))
+        self.top = TextBox(top, "Top", str(ymax))
         self.ylabel = TextBox(ylabel, "Y-Label", axes.get_ylabel())
 
         #Scale
-        xaxscale = toolfig.add_axes([0.6, 0.5, 0.075, 0.3])
+        xaxscale = toolfig.add_axes([0.6, 0.5, 0.09, 0.3])
         xaxscale.set_title("X Scale")
         active = -1
         if axes.get_xscale() == "linear":
@@ -1302,7 +1570,7 @@ class EditParamTool(Widget):
         self.xscaleChange = False
         self.newXscale = ""
 
-        yaxscale = toolfig.add_axes([0.75, 0.5, 0.075, 0.3])
+        yaxscale = toolfig.add_axes([0.75, 0.5, 0.09, 0.3])
         yaxscale.set_title("Y Scale")
         active = -1
         if axes.get_yscale() == "linear":
@@ -1327,8 +1595,11 @@ class EditParamTool(Widget):
             y_min, y_max = map(float, axes.get_ylim())
             self.clear_x(x_min, x_max, axes.get_xlabel())
             self.clear_y(y_min, y_max, axes.get_ylabel())
-            self.clear_scale(axes.get_xscale(), axes.get_yscale(), xaxscale, yaxscale)
+            self.clear_scale(axes.get_xscale(), axes.get_yscale())
             self.drawon = thisdrawon
+            if self.drawon:
+                toolfig.canvas.draw()
+                self.targetfig.canvas.draw()
 
         def func_apply(event):
             thisdrawon = self.drawon
@@ -1385,7 +1656,7 @@ class EditParamTool(Widget):
             y_min, y_max = map(float, axes.get_ylim())
             self.clear_x(x_min, x_max, axes.get_xlabel())
             self.clear_y(y_min, y_max, axes.get_ylabel())
-            self.clear_scale(axes.get_xscale(), axes.get_yscale(), xaxscale, yaxscale)
+            self.clear_scale(axes.get_xscale(), axes.get_yscale())
 
             self.drawon = thisdrawon
             if self.drawon:
@@ -1481,18 +1752,18 @@ class EditParamTool(Widget):
     def clear_x(self, xmin, xmax, xlabel):
         self.leftChange, self.rightChange, self.xlabelChange = False, False, False
         self.newLeft, self.newRight, self.newXlabel = "", "", ""
-        self.left.set_val(xmin)
-        self.right.set_val(xmax)
+        self.left.set_val(str(xmin))
+        self.right.set_val(str(xmax))
         self.xlabel.set_val(xlabel)
 
     def clear_y(self, ymin, ymax, ylabel):
         self.bottomChange, self.topChange, self.ylabelChange = False, False, False
         self.newBottom, self.newTop, self.newYlabel = "", "", ""
-        self.bottom.set_val(ymin)
-        self.top.set_val(ymax)
+        self.bottom.set_val(str(ymin))
+        self.top.set_val(str(ymax))
         self.ylabel.set_val(ylabel)
 
-    def clear_scale(self, xscale, yscale, xaxscale, yaxscale):
+    def clear_scale(self, xscale, yscale):
         self.xscaleChange, self.yscaleChange = False, False
         self.newXscale, self.newYscale = "", ""
         active = -1
