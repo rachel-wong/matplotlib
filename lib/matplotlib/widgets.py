@@ -1373,11 +1373,16 @@ class CurvesEditor(Widget):
 
         # marker info
         max1 = toolfig.add_axes([0.5, 0.45, 0.2, 0.075])
+        max2 = toolfig.add_axes([0.6, 0.35, 0.1, 0.075])
+        max3 = toolfig.add_axes([0.6, 0.25, 0.1, 0.075])
+        max4 = toolfig.add_axes([0.6, 0.15, 0.1, 0.075])
         max1.set_title(list(dict.fromkeys(self.MARKERS.values())), loc='left', wrap=True, fontsize=8)
         self.markerstyle = TextBox(max1, "Marker\nStyle", self.MARKERS.get(self.line.get_marker()))
-        self.markerstyleChange = False
-        self.newMarkerStyle = ""
-
+        self.size = TextBox(max2, "Size", str(self.line.get_markersize()))
+        self.face = TextBox(max3, "Face Color\n(RGBA)", self.line.get_markerfacecolor())
+        self.edge = TextBox(max4, "Edge Color:\n(RGBA)", self.line.get_markeredgecolor())
+        self.markerstyleChange, self.sizeChange, self.faceChange, self.edgeChange = False, False, False, False
+        self.newMarkerStyle, self.newSize, self.newFace, self.newEdge = "" , "", "", ""
 
         def line_switch(event):
             thisdrawon = self.drawon
@@ -1396,7 +1401,14 @@ class CurvesEditor(Widget):
                 self.drawstyle.set_active(active)
                 self.linewidth.set_val(str(self.line.get_linewidth()))
                 self.color.set_val(self.line.get_color())
-                self.markerstyle.set_val(self.line.get_marker())
+                self.markerstyle.set_val(self.MARKERS.get(self.line.get_marker()))
+                self.size.set_val(str(self.line.get_markersize()))
+                self.face.set_val(self.line.get_markerfacecolor())
+                self.edge.set_val(self.line.get_markeredgecolor())
+
+                self.viewChange, self.labelChange, self.linestyleChange, self.drawstyleChange, self.widthChange, \
+                self.colorChange, self.markerstyleChange, self.sizeChange, self.faceChange, self.edgeChange \
+                    = False, False, False, False, False, False, False, False, False, False
 
             self.drawon = thisdrawon
             if self.drawon:
@@ -1404,7 +1416,32 @@ class CurvesEditor(Widget):
                 self.targetfig.canvas.draw()
 
         def cancel(event):
-            print("cancell")
+            thisdrawon = self.drawon
+            self.drawon = False
+
+            self.view.set_val(self.viewLabel)
+            # update the curve info in the following fields:
+            self.label.set_val(self.viewLabel)
+            active = list(self.LINESTYLES.keys()).index(self.line.get_linestyle())
+            self.linestyle.set_active(active)
+            active = list(self.DRAWSTYLES.keys()).index(self.line.get_drawstyle())
+            self.drawstyle.set_active(active)
+            self.linewidth.set_val(str(self.line.get_linewidth()))
+            self.color.set_val(self.line.get_color())
+            self.markerstyle.set_val(self.MARKERS.get(self.line.get_marker()))
+            self.size.set_val(str(self.line.get_markersize()))
+            self.face.set_val(self.line.get_markerfacecolor())
+            self.edge.set_val(self.line.get_markeredgecolor())
+
+            self.viewChange, self.labelChange, self.linestyleChange, self.drawstyleChange, self.widthChange, \
+            self.colorChange, self.markerstyleChange, self.sizeChange, self.faceChange, self.edgeChange\
+                = False, False, False, False, False, False, False, False, False, False
+
+            self.drawon = thisdrawon
+            if self.drawon:
+                toolfig.canvas.draw()
+                self.targetfig.canvas.draw()
+
 
         def apply(event):
             thisdrawon = self.drawon
@@ -1429,8 +1466,17 @@ class CurvesEditor(Widget):
                 self.line.set_color(self.newColor)
                 self.colorChange = False
             if self.markerstyleChange:
-                self.line.set_marker(self.MARKERS.get(self.newMarkerStyle))
+                self.line.set_marker(self.newMarkerStyle)
                 self.markerstyleChange = False
+            if self.sizeChange:
+                self.line.set_markersize(self.newSize)
+                self.sizeChange = False
+            if self.faceChange:
+                self.line.set_markerfacecolor(self.newFace)
+                self.faceChange = False
+            if self.edgeChange:
+                self.line.set_markeredgecolor(self.newEdge)
+                self.edgeChange = False
 
             self.line = self.get_line(axes.get_lines(), self.viewLabel)
             self.drawon = thisdrawon
@@ -1448,6 +1494,9 @@ class CurvesEditor(Widget):
         self.linewidth.on_submit(self.func_width)
         self.color.on_submit(self.func_color)
         self.markerstyle.on_submit(self.func_marker_style)
+        self.size.on_submit(self.func_size)
+        self.face.on_submit(self.func_face)
+        self.edge.on_submit(self.func_edge)
 
 
     def get_labels(self, axes):
@@ -1521,7 +1570,7 @@ class CurvesEditor(Widget):
         if self.drawon:
             try:
                 rgba = mcolors.to_rgba(val)
-                self.newColor = rgba
+                self.newColor = val
                 self.colorChange = True
             except:
                 self.color.set_val(self.line.get_color())
@@ -1530,11 +1579,45 @@ class CurvesEditor(Widget):
     def func_marker_style(self, val):
         if self.drawon:
             if val in list(self.MARKERS.values()):
-                self.newMarkerStyle = val
+                style = ""
+                for i, j in self.MARKERS.items():
+                    if val == j:
+                        style = i
+                self.newMarkerStyle = style
                 self.markerstyleChange = True
             else:
                 self.markerstyle.set_val(self.MARKERS.get(self.line.get_marker()))
                 self.markerstyleChange = False
+
+    def func_size(self, val):
+        if self.drawon:
+            try:
+                float(val)
+                self.newSize = float(val)
+                self.sizeChange = True
+            except ValueError:
+                self.size.set_val(str(self.line.get_markersize()))
+                self.sizeChange = False
+
+    def func_face(self, val):
+        if self.drawon:
+            try:
+                rgba = mcolors.to_rgba(val)
+                self.newFace = val
+                self.faceChange = True
+            except:
+                self.face.set_val(self.line.get_markerfacecolor())
+                self.faceChange = False
+
+    def func_edge(self, val):
+        if self.drawon:
+            try:
+                rgba = mcolors.to_rgba(val)
+                self.newEdge = val
+                self.edgeChange = True
+            except:
+                self.edge.set_val(self.line.get_markeredgecolor())
+                self.edgeChange = False
 
 
 class AxesEditor(Widget):
