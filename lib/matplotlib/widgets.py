@@ -1322,6 +1322,8 @@ class CurvesEditor(Widget):
         'steps-mid': 'Steps (Mid)',
         'steps-post': 'Steps (Post)'}
 
+    MARKERS = markers.MarkerStyle.markers
+
     def __init__(self, targetfig, toolfig, axes):
 
         self.targetfig = targetfig
@@ -1330,7 +1332,7 @@ class CurvesEditor(Widget):
         # Buttons
         bax1 = toolfig.add_axes([0.65, 0.05, 0.15, 0.07])
         bax2 = toolfig.add_axes([0.83, 0.05, 0.15, 0.07])
-        bax3 = toolfig.add_axes([0.55, 0.75, 0.15, 0.07])
+        bax3 = toolfig.add_axes([0.53, 0.75, 0.15, 0.07])
         self.cancel = Button(bax1, "Cancel")
         self.apply = Button(bax2, "Apply")
         self.switchLine = Button(bax3, "Get Line Info")
@@ -1348,7 +1350,7 @@ class CurvesEditor(Widget):
         labelax = toolfig.add_axes([0.1, 0.6, 0.3, 0.075])
         self.labelChange = False
         self.newLabel = ""
-        self.label = TextBox(labelax, "Label", self.viewLabel)
+        self.label = TextBox(labelax, "Label\nName:", self.viewLabel)
 
         # Get line to edit
         self.line = self.get_line(axes.get_lines(), self.viewLabel)
@@ -1369,6 +1371,14 @@ class CurvesEditor(Widget):
         self.newLinestyle, self.newDrawstyle, self.newWidth, self.newColor = "", "", "", ""
         self.linestyleChange, self.drawstyleChange, self.widthChange, self.colorChange = False, False, False, False
 
+        # marker info
+        max1 = toolfig.add_axes([0.5, 0.45, 0.2, 0.075])
+        max1.set_title(list(dict.fromkeys(self.MARKERS.values())), loc='left', wrap=True, fontsize=8)
+        self.markerstyle = TextBox(max1, "Marker\nStyle", self.MARKERS.get(self.line.get_marker()))
+        self.markerstyleChange = False
+        self.newMarkerStyle = ""
+
+
         def line_switch(event):
             thisdrawon = self.drawon
             self.drawon = False
@@ -1386,6 +1396,7 @@ class CurvesEditor(Widget):
                 self.drawstyle.set_active(active)
                 self.linewidth.set_val(str(self.line.get_linewidth()))
                 self.color.set_val(self.line.get_color())
+                self.markerstyle.set_val(self.line.get_marker())
 
             self.drawon = thisdrawon
             if self.drawon:
@@ -1411,13 +1422,15 @@ class CurvesEditor(Widget):
                 self.line.set_drawstyle(self.newDrawstyle)
                 self.drawstyleChange = False
             if self.widthChange:
-                print("hi")
                 self.line.set_linewidth(self.newWidth)
                 self.widthChange = False
             if self.colorChange:
                 self.line.set_alpha(None)
                 self.line.set_color(self.newColor)
                 self.colorChange = False
+            if self.markerstyleChange:
+                self.line.set_marker(self.MARKERS.get(self.newMarkerStyle))
+                self.markerstyleChange = False
 
             self.line = self.get_line(axes.get_lines(), self.viewLabel)
             self.drawon = thisdrawon
@@ -1434,6 +1447,7 @@ class CurvesEditor(Widget):
         self.drawstyle.on_clicked(self.func_draw_style)
         self.linewidth.on_submit(self.func_width)
         self.color.on_submit(self.func_color)
+        self.markerstyle.on_submit(self.func_marker_style)
 
 
     def get_labels(self, axes):
@@ -1460,11 +1474,11 @@ class CurvesEditor(Widget):
     def func_label(self, val):
         if self.drawon:
             if val not in self.all_labels: # not same name as another line
-                self.labelChange = True
                 self.newLabel = val
+                self.labelChange = True
             else:
-                self.labelChange = False
                 self.label.set_val(self.viewLabel)
+                self.labelChange = False
 
     def func_line_style(self, val):
         if self.drawon:
@@ -1474,8 +1488,8 @@ class CurvesEditor(Widget):
                     style = i
 
             if style != self.line.get_linestyle():
-                self.linestyleChange = True
                 self.newLinestyle = style
+                self.linestyleChange = True
             else:
                 self.linestyleChange = False
 
@@ -1487,26 +1501,23 @@ class CurvesEditor(Widget):
                     style = i
 
             if style != self.line.get_drawstyle():
-                self.drawstyleChange = True
                 self.newDrawstyle = style
+                self.drawstyleChange = True
             else:
                 self.drawstyleChange = False
 
     def func_width(self, val):
         if self.drawon:
-            # print(val)
             try:
-                print(val)
                 float(val)
-                self.widthChange = True
                 self.newWidth = float(val)
+                self.widthChange = True
             except ValueError:
-                self.widthChange = False
                 self.linewidth.set_val(str(self.line.get_linewidth()))
+                self.widthChange = False
 
 
     def func_color(self, val):
-        print(val)
         if self.drawon:
             try:
                 rgba = mcolors.to_rgba(val)
@@ -1515,6 +1526,15 @@ class CurvesEditor(Widget):
             except:
                 self.color.set_val(self.line.get_color())
                 self.colorChange = False
+
+    def func_marker_style(self, val):
+        if self.drawon:
+            if val in list(self.MARKERS.values()):
+                self.newMarkerStyle = val
+                self.markerstyleChange = True
+            else:
+                self.markerstyle.set_val(self.MARKERS.get(self.line.get_marker()))
+                self.markerstyleChange = False
 
 
 class AxesEditor(Widget):
@@ -1685,8 +1705,8 @@ class AxesEditor(Widget):
         if self.drawon:
             try:
                 float(val)
-                self.leftChange = True
                 self.newLeft = float(val)
+                self.leftChange = True
             except ValueError:
                 self.leftChange = False
 
@@ -1694,8 +1714,8 @@ class AxesEditor(Widget):
         if self.drawon:
             try:
                 float(val)
-                self.rightChange = True
                 self.newRight = float(val)
+                self.rightChange = True
             except ValueError:
                 self.rightChange = False
 
@@ -1703,8 +1723,8 @@ class AxesEditor(Widget):
         if self.drawon:
             try:
                 float(val)
-                self.bottomChange = True
                 self.newBottom = float(val)
+                self.bottomChange = True
             except ValueError:
                 self.bottomChange = False
 
@@ -1712,60 +1732,58 @@ class AxesEditor(Widget):
         if self.drawon:
             try:
                 float(val)
-                self.topChange = True
                 self.newTop = float(val)
+                self.topChange = True
             except ValueError:
                 self.topChange = False
 
     def func_x_label(self, val):
         if self.drawon:
-            self.xlabelChange = True
             self.newXlabel = val
+            self.xlabelChange = True
 
     def func_y_label(self, val):
         if self.drawon:
-            self.ylabelChange = True
             self.newYlabel = val
+            self.ylabelChange = True
 
     def func_x_scale(self, val):
         if self.drawon:
-            self.xscaleChange = True
             self.newXscale = val
+            self.xscaleChange = True
 
     def func_y_scale(self, val):
         if self.drawon:
-            self.yscaleChange = True
             self.newYscale = val
+            self.yscaleChange = True
 
     def func_legend(self, val):
         if self.drawon:
             self.drawLegend = self.legend.get_status()[0]
 
     def clear_title_legend(self, title):
-        self.titleChange = False
         self.newTitle = ""
         self.title.set_val(title)
+        self.titleChange = False
         if self.legend.get_status()[0]:
             self.legend.set_active(0)
             self.drawLegend = False
 
     def clear_x(self, xmin, xmax, xlabel):
-        self.leftChange, self.rightChange, self.xlabelChange = False, False, False
-        self.newLeft, self.newRight, self.newXlabel = "", "", ""
         self.left.set_val(str(xmin))
         self.right.set_val(str(xmax))
         self.xlabel.set_val(xlabel)
+        self.leftChange, self.rightChange, self.xlabelChange = False, False, False
+        self.newLeft, self.newRight, self.newXlabel = "", "", ""
 
     def clear_y(self, ymin, ymax, ylabel):
-        self.bottomChange, self.topChange, self.ylabelChange = False, False, False
-        self.newBottom, self.newTop, self.newYlabel = "", "", ""
         self.bottom.set_val(str(ymin))
         self.top.set_val(str(ymax))
         self.ylabel.set_val(ylabel)
+        self.bottomChange, self.topChange, self.ylabelChange = False, False, False
+        self.newBottom, self.newTop, self.newYlabel = "", "", ""
 
     def clear_scale(self, xscale, yscale):
-        self.xscaleChange, self.yscaleChange = False, False
-        self.newXscale, self.newYscale = "", ""
         active = -1
         if xscale == "linear":
             active = 0
@@ -1783,6 +1801,8 @@ class AxesEditor(Widget):
         elif yscale == "logit":
             active = 2
         self.yscale.set_active(active)
+        self.xscaleChange, self.yscaleChange = False, False
+        self.newXscale, self.newYscale = "", ""
 
 class Cursor(AxesWidget):
     """
